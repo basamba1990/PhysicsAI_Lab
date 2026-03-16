@@ -1,0 +1,10 @@
+{
+  "name": "ethics-validator",
+  "version": "1.0.0",
+  "description": "Ethics validation Edge Function",
+  "main": "index.ts",
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4"
+  }
+}

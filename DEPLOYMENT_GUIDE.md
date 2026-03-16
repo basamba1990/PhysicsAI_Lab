@@ -1,273 +1,272 @@
-# Physics AI Dashboard - Guide de Déploiement Complet
+# Physics AI Lab - Deployment Guide (Vercel + Supabase)
 
-## 📋 Table des Matières
+## Overview
 
-1. [Architecture Globale](#architecture-globale)
-2. [Prérequis](#prérequis)
-3. [Installation Locale](#installation-locale)
-4. [Configuration Supabase](#configuration-supabase)
-5. [Déploiement Production](#déploiement-production)
-6. [Intégration ONNX](#intégration-onnx)
-7. [Monitoring et Maintenance](#monitoring-et-maintenance)
+Physics AI Lab is a full-stack Next.js application for managing Physics-Informed Neural Networks (PINN) and Physics-Informed Operator Networks (PINO) simulations. This guide covers deployment to **Vercel** (frontend/backend) and **Supabase** (database + Edge Functions).
 
----
-
-## Architecture Globale
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Physics AI Dashboard                     │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Frontend (React + Tailwind)                               │
-│  ├─ Dashboard avec visualisations 2D/3D                    │
-│  ├─ Formulaires de simulation                              │
-│  ├─ Graphiques de performance                              │
-│  └─ Gestion des versions de modèles                        │
-│                                                             │
-│  Backend (Express + tRPC)                                  │
-│  ├─ API REST pour simulations                              │
-│  ├─ Gestion des jobs d'entraînement                        │
-│  ├─ Validation éthique                                     │
-│  └─ Versioning de modèles                                  │
-│                                                             │
-│  Edge Functions (Supabase + Deno)                          │
-│  ├─ Inférence ONNX                                         │
-│  ├─ Monte Carlo Dropout (UQ)                               │
-│  ├─ Cache des prédictions                                  │
-│  └─ Logging et traçabilité                                 │
-│                                                             │
-│  Base de Données (MySQL/TiDB)                              │
-│  ├─ Simulations                                            │
-│  ├─ Prédictions (cache)                                    │
-│  ├─ Versions de modèles                                    │
-│  ├─ Logs éthiques                                          │
-│  └─ Jobs d'entraînement                                    │
-│                                                             │
-│  Stockage (Supabase Storage)                               │
-│  ├─ Modèles ONNX                                           │
-│  ├─ Datasets CFD                                           │
-│  └─ Checkpoints d'entraînement                             │
-│                                                             │
+│                    Vercel (Next.js)                         │
+│  Frontend (React) + Backend (API Routes)                    │
+│  - Dashboard with Recharts visualizations                  │
+│  - Authentication via Supabase                             │
+│  - Simulation management interface                         │
+└──────────────────────┬──────────────────────────────────────┘
+                       │ HTTP/REST
+┌──────────────────────▼──────────────────────────────────────┐
+│           Supabase (Backend Infrastructure)                │
+│  ┌─────────────────────────────────────────────────────┐  │
+│  │ PostgreSQL Database                                 │  │
+│  │ - simulations, predictions, model_versions         │  │
+│  │ - training_jobs, ethics_logs                       │  │
+│  │ - Row Level Security (RLS) enabled                │  │
+│  └─────────────────────────────────────────────────────┘  │
+│  ┌─────────────────────────────────────────────────────┐  │
+│  │ Authentication (Email, Google, GitHub OAuth)       │  │
+│  │ - User management and session handling             │  │
+│  └─────────────────────────────────────────────────────┘  │
+│  ┌─────────────────────────────────────────────────────┐  │
+│  │ Edge Functions (Deno/TypeScript)                   │  │
+│  │ - predict-flow: PINN/PINO inference                │  │
+│  └─────────────────────────────────────────────────────┘  │
+│  ┌─────────────────────────────────────────────────────┐  │
+│  │ Storage (S3-compatible)                             │  │
+│  │ - ONNX models, simulation results                  │  │
+│  └─────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
----
+## Prerequisites
 
-## Prérequis
+- Node.js 18+ and npm/pnpm
+- Supabase account (https://supabase.com)
+- Vercel account (https://vercel.com)
+- GitHub repository
 
-### Outils Requis
-- Node.js 18+ avec pnpm
-- Python 3.10+ avec pip
-- Docker (optionnel, pour Supabase local)
-- Git
+## Step 1: Supabase Setup
 
-### Comptes Externes
-- Supabase (gratuit ou payant)
-- Manus (pour OAuth)
+### 1.1 Create Supabase Project
 
-### Dépendances Python
+1. Go to https://supabase.com and sign in
+2. Click "New Project"
+3. Enter project name: `physics-ai-lab`
+4. Choose a region close to your users
+5. Set a strong database password
+6. Click "Create new project"
+
+### 1.2 Apply Database Schema
+
+1. In Supabase dashboard, go to **SQL Editor**
+2. Create a new query
+3. Copy the contents of `supabase/migrations/001_initial_schema.sql`
+4. Paste into the SQL editor and execute
+
+### 1.3 Configure Authentication
+
+1. Go to **Authentication → Providers**
+2. Enable "Email" provider
+3. Go to **Authentication → URL Configuration**
+4. Add your Vercel deployment URL to "Redirect URLs":
+   ```
+   https://your-app.vercel.app/auth/callback
+   https://your-app.vercel.app
+   ```
+
+### 1.4 Get Connection Details
+
+1. Go to **Project Settings → Database**
+2. Copy the "Connection string" (PostgreSQL URI)
+3. Go to **Project Settings → API**
+4. Copy "Project URL" and "anon key"
+5. Go to **Project Settings → API → Service Role Key**
+6. Copy the "Service Role Key"
+
+## Step 2: Deploy Edge Functions to Supabase
+
+### 2.1 Install Supabase CLI
+
 ```bash
-pip install -r requirements.txt
+npm install -g supabase
 ```
 
-### Dépendances Node.js
+### 2.2 Link Project
+
 ```bash
-pnpm install
+cd physics-ai-lab-nextjs
+supabase link --project-ref <YOUR_PROJECT_ID>
 ```
 
----
+### 2.3 Deploy Functions
 
-## Installation Locale
-
-### 1. Cloner le projet
 ```bash
-git clone <repository-url>
-cd physics-ai-dashboard
+supabase functions deploy predict-flow
 ```
 
-### 2. Configurer les variables d'environnement
-```bash
-cp .env.example .env.local
-```
+## Step 3: Deploy to Vercel
 
-Éditer `.env.local` avec :
-```
-DATABASE_URL=mysql://user:password@localhost:3306/physics_ai
-SUPABASE_URL=https://your-project.supabase.co
+### 3.1 Prepare Environment Variables
+
+Create a `.env.local` file with:
+
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://[PROJECT_ID].supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-ONNX_MODEL_PATH=https://storage.supabase.co/models/pinn_model.onnx
 ```
 
-### 3. Initialiser la base de données
+### 3.2 Push to GitHub
+
 ```bash
-pnpm drizzle-kit generate
-pnpm drizzle-kit migrate
+git add .
+git commit -m "Initial Physics AI Lab deployment"
+git push origin main
 ```
 
-### 4. Lancer le serveur de développement
+### 3.3 Deploy to Vercel
+
+1. Go to https://vercel.com/new
+2. Import your GitHub repository
+3. Select "Next.js" as the framework
+4. Configure build settings:
+   - Build Command: `npm run build`
+   - Output Directory: `.next`
+   - Install Command: `npm install`
+
+5. Add Environment Variables:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://[PROJECT_ID].supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   ```
+
+6. Click "Deploy"
+
+### 3.4 Update Supabase Redirect URLs
+
+After deployment, update Supabase redirect URLs with your Vercel domain:
+
+1. Go to Supabase **Authentication → URL Configuration**
+2. Add:
+   ```
+   https://your-vercel-domain.vercel.app/auth/callback
+   https://your-vercel-domain.vercel.app
+   ```
+
+## Step 4: Post-Deployment Configuration
+
+### 4.1 Test Database Connection
+
 ```bash
-pnpm dev
+# From your local machine
+psql postgresql://postgres:[PASSWORD]@db.[PROJECT_ID].supabase.co:5432/postgres
 ```
 
-L'application sera disponible à `http://localhost:3000`
+### 4.2 Verify Edge Functions
 
----
-
-## Configuration Supabase
-
-### 1. Créer un projet Supabase
-- Aller sur https://supabase.com
-- Créer un nouveau projet
-- Copier l'URL et la clé de service
-
-### 2. Créer les tables
 ```bash
-# Exécuter le schema SQL
-psql -h your-project.supabase.co -U postgres -d postgres -f infrastructure/supabase/schema.sql
+curl -X POST https://[PROJECT_ID].supabase.co/functions/v1/predict-flow \
+  -H "Authorization: Bearer [ANON_KEY]" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "simulationId": "test-123",
+    "modelVersionId": "model-456",
+    "parameters": {"temperature": 100}
+  }'
 ```
 
-### 3. Configurer les Edge Functions
-```bash
-# Déployer l'Edge Function predict-flow
-supabase functions deploy predict-flow --project-id your-project-id
-```
+### 4.3 Test Application
 
-### 4. Configurer le stockage
-```bash
-# Créer les buckets
-supabase storage create-bucket models --public
-supabase storage create-bucket datasets --public
-```
+1. Navigate to your Vercel deployment URL
+2. Click "Sign In"
+3. Create an account or sign in with Google/GitHub
+4. Verify dashboard loads correctly
 
----
+## Environment Variables Reference
 
-## Déploiement Production
-
-### Option 1: Manus Hosting (Recommandé)
-```bash
-# Créer un checkpoint
-pnpm webdev-save-checkpoint "Production v1.0"
-
-# Cliquer sur "Publish" dans l'interface Manus
-```
-
-### Option 2: Vercel
-```bash
-# Installer Vercel CLI
-npm i -g vercel
-
-# Déployer
-vercel --prod
-```
-
-### Option 3: Railway
-```bash
-# Installer Railway CLI
-npm i -g @railway/cli
-
-# Déployer
-railway up
-```
-
----
-
-## Intégration ONNX
-
-### 1. Exporter le modèle PINN
-```python
-from core.pinn_engine import PINNSurrogate
-
-# Charger le modèle entraîné
-pinn = PINNSurrogate(config)
-pinn.load_model("models/pinn_v1.pt")
-
-# Exporter en ONNX
-pinn.export_onnx("models/pinn_v1.onnx")
-```
-
-### 2. Uploader le modèle ONNX
-```bash
-# Uploader vers Supabase Storage
-supabase storage upload models pinn_v1.onnx --project-id your-project-id
-```
-
-### 3. Configurer l'Edge Function
-```typescript
-// infrastructure/supabase/functions/predict-flow/index.ts
-const modelPath = "https://storage.supabase.co/models/pinn_v1.onnx"
-```
-
----
-
-## Monitoring et Maintenance
-
-### Logs
-```bash
-# Voir les logs du serveur
-pnpm dev 2>&1 | tee logs/server.log
-
-# Voir les logs des Edge Functions
-supabase functions logs predict-flow --project-id your-project-id
-```
-
-### Métriques
-- Dashboard Supabase : https://app.supabase.com
-- Monitoring des prédictions : `/api/trpc/simulations.list`
-- Logs éthiques : `/api/trpc/ethics.getLogs`
-
-### Maintenance
-```bash
-# Nettoyer le cache des prédictions
-DELETE FROM predictions WHERE created_at < NOW() - INTERVAL 7 DAY;
-
-# Archiver les jobs d'entraînement anciens
-UPDATE training_jobs SET status = 'archived' WHERE completed_at < NOW() - INTERVAL 30 DAY;
-```
-
----
+| Variable | Description | Source |
+|----------|-------------|--------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Supabase Settings |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public API key | Supabase Settings |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (secret) | Supabase Settings |
 
 ## Troubleshooting
 
-### Erreur: "Model not loaded"
-- Vérifier que `ONNX_MODEL_PATH` est correct
-- Vérifier que le fichier ONNX existe dans Supabase Storage
-- Vérifier les logs de l'Edge Function
+### Issue: Authentication Redirect Loop
 
-### Erreur: "Database connection failed"
-- Vérifier `DATABASE_URL`
-- Vérifier que la base de données est accessible
-- Vérifier les credentials
+**Solution:**
+1. Verify redirect URLs in Supabase match your Vercel domain
+2. Check `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are correct
+3. Clear browser cookies and retry
 
-### Erreur: "CORS error"
-- Vérifier les headers CORS dans l'Edge Function
-- Vérifier que l'URL frontend est whitelistée
+### Issue: Database Connection Failed
 
----
+**Solution:**
+1. Verify `NEXT_PUBLIC_SUPABASE_URL` is correct
+2. Check firewall rules in Supabase
+3. Ensure IP whitelist includes Vercel IPs
 
-## Support et Documentation
+### Issue: Edge Functions Timeout
 
-- **Documentation API** : `/api/docs`
-- **Docs Supabase** : https://supabase.com/docs
-- **Docs Deno** : https://deno.land/manual
-- **Docs ONNX** : https://onnx.ai/docs
+**Solution:**
+1. Check function logs: `supabase functions logs predict-flow`
+2. Optimize function code
+3. Increase timeout if needed
 
----
+## Monitoring & Maintenance
 
-## Checklist de Déploiement
+### Database Backups
 
-- [ ] Variables d'environnement configurées
-- [ ] Base de données initialisée
-- [ ] Modèle ONNX exporté et uploadé
-- [ ] Edge Functions déployées
-- [ ] Tests passants (`pnpm test`)
-- [ ] Build production réussi (`pnpm build`)
-- [ ] Monitoring configuré
-- [ ] Backups configurés
-- [ ] Documentation à jour
-- [ ] Équipe informée
+1. Go to Supabase **Project Settings → Backups**
+2. Enable automatic daily backups
+3. Configure backup retention policy
 
----
+### Logs
 
-**Dernière mise à jour** : 2026-03-15
-**Version** : 1.0.0
+- **Vercel Logs**: https://vercel.com/dashboard → Project → Deployments → Logs
+- **Supabase Logs**: https://supabase.com → Project → Logs
+
+### Performance
+
+- Monitor database query performance in Supabase
+- Check Edge Function execution times
+- Use Vercel Analytics for frontend performance
+
+## Security Best Practices
+
+1. **Secrets Management**
+   - Never commit `.env` files
+   - Use Vercel Environment Variables UI
+   - Rotate API keys regularly
+
+2. **Database Security**
+   - Enable RLS policies (already done)
+   - Use strong passwords
+   - Enable SSL connections
+
+3. **API Security**
+   - Validate all inputs
+   - Implement rate limiting
+   - Use HTTPS only
+
+4. **Authentication**
+   - Enforce strong passwords
+   - Enable 2FA for admin accounts
+   - Audit access logs
+
+## Support & Resources
+
+- **Supabase Docs**: https://supabase.com/docs
+- **Vercel Docs**: https://vercel.com/docs
+- **Next.js Docs**: https://nextjs.org/docs
+- **Recharts Docs**: https://recharts.org
+
+## Next Steps
+
+1. Set up monitoring and alerting
+2. Configure backup strategy
+3. Implement CI/CD pipeline
+4. Add custom domain
+5. Scale infrastructure as needed
